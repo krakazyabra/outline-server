@@ -153,16 +153,17 @@ async function main() {
 
   // Start Prometheus subprocess and wait for it to be up and running.
   const prometheusConfigFilename = getPersistentFilename('prometheus/config.yml');
+  const prometheusWebConfigFilename = getPersistentFilename('prometheus/web.yml');
   const prometheusTsdbFilename = getPersistentFilename('prometheus/data');
   const prometheusEndpoint = `http://${prometheusLocation}`;
   const prometheusBinary = getBinaryFilename('prometheus');
   const prometheusArgs = [
-    '--config.file', prometheusConfigFilename, '--web.enable-admin-api',
+    '--config.file', prometheusConfigFilename, '--web.config.file', prometheusWebConfigFilename, '--web.enable-admin-api',
     '--storage.tsdb.retention.time', '31d', '--storage.tsdb.path', prometheusTsdbFilename,
     '--web.listen-address', prometheusLocation, '--log.level', verbose ? 'debug' : 'info'
   ];
   await startPrometheus(
-      prometheusBinary, prometheusConfigFilename, prometheusConfigJson, prometheusArgs,
+      prometheusBinary, prometheusConfigFilename, prometheusWebConfigFilename, prometheusConfigJson, prometheusArgs,
       prometheusEndpoint);
 
   const prometheusClient = new PrometheusClient(prometheusEndpoint);
