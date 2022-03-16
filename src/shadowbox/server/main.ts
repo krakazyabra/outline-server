@@ -113,7 +113,7 @@ async function main() {
   const prometheusPort = await portProvider.reserveFirstFreePort(9090);
   // Use 127.0.0.1 instead of localhost for Prometheus because it's resolving incorrectly for some users.
   // See https://github.com/Jigsaw-Code/outline-server/issues/341
-  const prometheusLocation = `:${prometheusPort}`;
+  const prometheusLocation = `0.0.0.0:${prometheusPort}`;
 
   const nodeMetricsPort = await portProvider.reserveFirstFreePort(prometheusPort + 1);
   exportPrometheusMetrics(prometheus.register, nodeMetricsPort);
