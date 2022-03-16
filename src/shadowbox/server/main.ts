@@ -163,7 +163,7 @@ async function main() {
     '--web.listen-address', prometheusLocation, '--log.level', verbose ? 'debug' : 'info'
   ];
   await startPrometheus(
-      prometheusBinary, prometheusConfigFilename, prometheusWebConfigFilename, prometheusConfigJson, prometheusArgs,
+      prometheusBinary, prometheusConfigFilename, prometheusConfigJson, prometheusArgs,
       prometheusEndpoint);
 
   const prometheusClient = new PrometheusClient(prometheusEndpoint);
