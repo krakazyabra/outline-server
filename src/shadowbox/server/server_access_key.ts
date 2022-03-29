@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as randomstring from 'randomstring';
+import cryptoRandomString from 'crypto-random-string';
 import * as uuidv4 from 'uuid/v4';
 
 import {Clock} from '../infrastructure/clock';
@@ -53,7 +53,7 @@ class ServerAccessKey implements AccessKey {
 
 // Generates a random password for Shadowsocks access keys.
 function generatePassword(): string {
-  return randomstring.generate(12);
+  return cryptoRandomString({length: 12, type: 'alphanumeric'});
 }
 
 function makeAccessKey(hostname: string, accessKeyJson: AccessKeyStorageJson): AccessKey {
@@ -169,7 +169,7 @@ export class ServerAccessKeyRepository implements AccessKeyRepository {
 
   listAccessKeys(): AccessKey[] {
     return Array.from(this.accessKeys.values())
-      .sort((a, b) => parseInt(a.id) - parseInt(b.id));
+      .sort((a, b) => parseInt(a.id, 10) - parseInt(b.id, 10));
   }
 
   renameAccessKey(id: AccessKeyId, name: string) {
@@ -244,7 +244,7 @@ export class ServerAccessKeyRepository implements AccessKeyRepository {
   }
 
   private loadAccessKeys(): Map<string, ServerAccessKey> {
-    let keyMap = new Map<string, ServerAccessKey>();
+    const keyMap = new Map<string, ServerAccessKey>();
     for (const accessKey of this.keyConfig.data().accessKeys) {
       keyMap.set(accessKey.id, makeAccessKey(this.proxyHostname, accessKey));
     }
