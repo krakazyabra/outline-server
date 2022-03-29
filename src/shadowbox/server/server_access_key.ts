@@ -104,7 +104,7 @@ export class ServerAccessKeyRepository implements AccessKeyRepository {
   private static DATA_LIMITS_ENFORCEMENT_INTERVAL_MS =
     process.env.DATA_LIMIT_ENFORCEMENT_M * 60 * 1000; // 1h
   private NEW_USER_ENCRYPTION_METHOD = 'chacha20-ietf-poly1305';
-  private accessKeys: ServerAccessKey[];
+  private accessKeys: Map<AccessKeyId, ServerAccessKey>;
 
   constructor(
     private portForNewAccessKeys: number,
@@ -142,9 +142,12 @@ export class ServerAccessKeyRepository implements AccessKeyRepository {
   }
 
   private isExistingAccessKeyPort(port: number): boolean {
-    return this.accessKeys.some((key) => {
-      return key.proxyParams.portNumber === port;
-    });
+    for (const key of this.accessKeys.values()) {
+      if (key.proxyParams.portNumber === port) {
+        return true;
+      }
+    }
+    return false;
   }
 
   setHostname(hostname: string): void {
@@ -173,27 +176,24 @@ export class ServerAccessKeyRepository implements AccessKeyRepository {
       password,
     };
     const accessKey = new ServerAccessKey(id, '', metricsId, proxyParams);
-    this.accessKeys.push(accessKey);
+    this.accessKeys.set(accessKey.id, accessKey);
     this.saveAccessKeys();
     await this.updateServer();
     return accessKey;
   }
 
   removeAccessKey(id: AccessKeyId) {
-    for (let ai = 0; ai < this.accessKeys.length; ai++) {
-      const accessKey = this.accessKeys[ai];
-      if (accessKey.id === id) {
-        this.accessKeys.splice(ai, 1);
-        this.saveAccessKeys();
-        this.updateServer();
-        return;
-      }
+    if (this.accessKeys.delete(id)) {
+      this.saveAccessKeys();
+      this.updateServer();
+    } else {
+      throw new errors.AccessKeyNotFound(id);
     }
-    throw new errors.AccessKeyNotFound(id);
   }
 
   listAccessKeys(): AccessKey[] {
-    return [...this.accessKeys]; // Return a copy of the access key array.
+    return Array.from(this.accessKeys.values())
+      .sort((a, b) => parseInt(a.id) - parseInt(b.id));
   }
 
   renameAccessKey(id: AccessKeyId, name: string) {
@@ -240,7 +240,7 @@ export class ServerAccessKeyRepository implements AccessKeyRepository {
     const bytesTransferredById = (await metrics.getOutboundByteTransfer({hours: 30 * 24}))
       .bytesTransferredByUserId;
     let limitStatusChanged = false;
-    for (const accessKey of this.accessKeys) {
+    for (const accessKey of this.accessKeys.values()) {
       const usageBytes = bytesTransferredById[accessKey.id] ?? 0;
       const wasOverDataLimit = accessKey.isOverDataLimit;
       let limitBytes = (accessKey.dataLimit ?? this._defaultDataLimit)?.bytes;
@@ -256,35 +256,37 @@ export class ServerAccessKeyRepository implements AccessKeyRepository {
   }
 
   private updateServer(): Promise<void> {
-    const serverAccessKeys = this.accessKeys
-      .filter((key) => !key.isOverDataLimit)
-      .map((key) => {
-        return {
-          id: key.id,
-          port: key.proxyParams.portNumber,
-          cipher: key.proxyParams.encryptionMethod,
-          secret: key.proxyParams.password,
-        };
-      });
+    const serverAccessKeys = this.listAccessKeys().filter(key => !key.isOverDataLimit).map(key => {
+      return {
+        id: key.id,
+        port: key.proxyParams.portNumber,
+        cipher: key.proxyParams.encryptionMethod,
+        secret: key.proxyParams.password
+      };
+    });
     return this.shadowsocksServer.update(serverAccessKeys);
   }
 
-  private loadAccessKeys(): AccessKey[] {
-    return this.keyConfig.data().accessKeys.map((key) => makeAccessKey(this.proxyHostname, key));
+  private loadAccessKeys(): Map<string, ServerAccessKey> {
+    let keyMap = new Map<string, ServerAccessKey>();
+    for (const accessKey of this.keyConfig.data().accessKeys) {
+      keyMap.set(accessKey.id, makeAccessKey(this.proxyHostname, accessKey));
+    }
+    return keyMap;
   }
 
   private saveAccessKeys() {
-    this.keyConfig.data().accessKeys = this.accessKeys.map((key) => accessKeyToStorageJson(key));
+    this.keyConfig.data().accessKeys = this.listAccessKeys().map(key => accessKeyToStorageJson(key));
     this.keyConfig.write();
   }
 
   // Returns a reference to the access key with `id`, or throws if the key is not found.
   private getAccessKey(id: AccessKeyId): ServerAccessKey {
-    for (const accessKey of this.accessKeys) {
-      if (accessKey.id === id) {
-        return accessKey;
-      }
+    const key = this.accessKeys.get(id);
+    if (key === undefined) {
+      throw new errors.AccessKeyNotFound(id);
+    } else {
+      return key;
     }
-    throw new errors.AccessKeyNotFound(id);
   }
 }
