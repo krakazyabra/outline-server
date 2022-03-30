@@ -83,7 +83,7 @@ function accessKeyToStorageJson(accessKey: AccessKey): AccessKeyStorageJson {
 // to start and stop per-access-key Shadowsocks instances.  Requires external validation
 // that portForNewAccessKeys is valid.
 export class ServerAccessKeyRepository implements AccessKeyRepository {
-  private static DATA_LIMITS_ENFORCEMENT_INTERVAL_MS = 10 * 60 * 1000; // 1h
+  private static DATA_LIMITS_ENFORCEMENT_INTERVAL_MS = 5 * 60 * 1000; // 1h
   private NEW_USER_ENCRYPTION_METHOD = 'chacha20-ietf-poly1305';
   private accessKeys: Map<AccessKeyId, ServerAccessKey>;
 
