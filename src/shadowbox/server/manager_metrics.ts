@@ -16,28 +16,36 @@ import {PrometheusClient} from '../infrastructure/prometheus_scraper';
 import {DataUsageByUser, DataUsageTimeframe} from '../model/metrics';
 
 export interface ManagerMetrics {
-  getOutboundByteTransfer(timeframe: DataUsageTimeframe): Promise<DataUsageByUser>;
+    getOutboundByteTransfer(timeframe: DataUsageTimeframe): Promise<DataUsageByUser>;
+    getOutboundByteTransferForKey(timeframe: DataUsageTimeframe, accessKeyId?: string): Promise<number>;
 }
 
 // Reads manager metrics from a Prometheus instance.
 export class PrometheusManagerMetrics implements ManagerMetrics {
-  constructor(private prometheusClient: PrometheusClient) {}
-
-  async getOutboundByteTransfer(timeframe: DataUsageTimeframe): Promise<DataUsageByUser> {
-    // TODO(fortuna): Consider pre-computing this to save server's CPU.
-    // We measure only traffic leaving the server, since that's what DigitalOcean charges.
-    // TODO: Display all directions to admin
-    const result =
-        await this.prometheusClient.query(`sum(increase(shadowsocks_data_bytes{dir=~"c<p|p>t"}[${
-            timeframe.hours}h])) by (access_key)`);
-    const usage = {} as {[userId: string]: number};
-    for (const entry of result.result) {
-      const bytes = Math.round(parseFloat(entry.value[1]));
-      if (bytes === 0) {
-        continue;
-      }
-      usage[entry.metric['access_key'] || ''] = bytes;
+    constructor(private prometheusClient: PrometheusClient) {
     }
-    return {bytesTransferredByUserId: usage};
-  }
+
+    async getOutboundByteTransfer(timeframe: DataUsageTimeframe): Promise<DataUsageByUser> {
+        // TODO(fortuna): Consider pre-computing this to save server's CPU.
+        // We measure only traffic leaving the server, since that's what DigitalOcean charges.
+        // TODO: Display all directions to admin
+        const result =
+            await this.prometheusClient.query(`sum(increase(shadowsocks_data_bytes{dir=~"c<p|p>t"}[${
+                timeframe.hours}h])) by (access_key)`);
+        const usage = {} as { [userId: string]: number };
+        for (const entry of result.result) {
+            const bytes = Math.round(parseFloat(entry.value[1]));
+            if (bytes === 0) {
+                continue;
+            }
+            usage[entry.metric['access_key'] || ''] = bytes;
+        }
+        return {bytesTransferredByUserId: usage};
+    }
+
+    async getOutboundByteTransferForKey(timeframe: DataUsageTimeframe, accessKeyId?: string): Promise<number> {
+        const result =
+            await this.prometheusClient.query(`sum(increase(shadowsocks_data_bytes{dir=~"c<p|p>t",access_key="${accessKeyId}"}[${timeframe.hours}h])) by (access_key)`);
+        return Math.round(parseFloat(result.result[1]?.value[1] || "0"));
+    }
 }

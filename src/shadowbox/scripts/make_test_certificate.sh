@@ -25,7 +25,7 @@ declare -a openssl_req_flags=(
   -nodes
   -days 36500
   -newkey rsa:2048
-  -subj '/CN=localhost'
+  -subj '/CN=127.0.0.1'
   -keyout "${SB_PRIVATE_KEY_FILE}"
   -out "${SB_CERTIFICATE_FILE}"
 )

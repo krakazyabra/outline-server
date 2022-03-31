@@ -123,6 +123,7 @@ export function bindService(
   apiServer.put(`${apiPrefix}/access-keys/:id/name`, service.renameAccessKey.bind(service));
   apiServer.put(`${apiPrefix}/access-keys/:id/data-limit`, service.setAccessKeyDataLimit.bind(service));
   apiServer.del(`${apiPrefix}/access-keys/:id/data-limit`, service.removeAccessKeyDataLimit.bind(service));
+  apiServer.get(`${apiPrefix}/access-keys/:id/data-limit`, service.getDataUsageForKey.bind(service));
 
   apiServer.get(`${apiPrefix}/metrics/transfer`, service.getDataUsage.bind(service));
   apiServer.get(`${apiPrefix}/metrics/enabled`, service.getShareMetrics.bind(service));
@@ -421,6 +422,20 @@ export class ShadowsocksManagerService {
       const response = await this.managerMetrics.getOutboundByteTransfer({hours: 30 * 24});
       res.send(HttpSuccess.OK, response);
       logging.debug(`getDataUsage response ${JSON.stringify(response)}`);
+      return next();
+    } catch (error) {
+      logging.error(error);
+      return next(new restifyErrors.InternalServerError());
+    }
+  }
+
+  public async getDataUsageForKey(req: RequestType, res: ResponseType, next: restify.Next) {
+    try {
+      logging.debug(`getDataUsageForKey request ${JSON.stringify(req.params)}`);
+      const keyId = req.params.id.toString();
+      const response = await this.managerMetrics.getOutboundByteTransferForKey({hours: 30 * 24}, keyId);
+      res.send(HttpSuccess.OK, {usage: response});
+      logging.debug(`getDataUsageForKey response ${JSON.stringify(response)}`);
       return next();
     } catch (error) {
       logging.error(error);

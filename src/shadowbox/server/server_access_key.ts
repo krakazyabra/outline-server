@@ -83,7 +83,7 @@ function accessKeyToStorageJson(accessKey: AccessKey): AccessKeyStorageJson {
 // to start and stop per-access-key Shadowsocks instances.  Requires external validation
 // that portForNewAccessKeys is valid.
 export class ServerAccessKeyRepository implements AccessKeyRepository {
-  private static DATA_LIMITS_ENFORCEMENT_INTERVAL_MS = 10 * 60 * 1000; // 1h
+  private static DATA_LIMITS_ENFORCEMENT_INTERVAL_MS = 10 * 1000; // 1h
   private NEW_USER_ENCRYPTION_METHOD = 'chacha20-ietf-poly1305';
   private accessKeys: Map<AccessKeyId, ServerAccessKey>;
 
@@ -169,6 +169,7 @@ export class ServerAccessKeyRepository implements AccessKeyRepository {
 
   listAccessKeys(): AccessKey[] {
     return Array.from(this.accessKeys.values())
+        // tslint:disable-next-line:radix
       .sort((a, b) => parseInt(a.id) - parseInt(b.id));
   }
 
@@ -213,11 +214,10 @@ export class ServerAccessKeyRepository implements AccessKeyRepository {
   // Updates access key data usage.
   async enforceAccessKeyDataLimits() {
     const metrics = new PrometheusManagerMetrics(this.prometheusClient);
-    const bytesTransferredById =
-        (await metrics.getOutboundByteTransfer({hours: 30 * 24})).bytesTransferredByUserId;
     let limitStatusChanged = false;
     for (const accessKey of this.accessKeys.values()) {
-      const usageBytes = bytesTransferredById[accessKey.id] ?? 0;
+      const usageBytes = await metrics.getOutboundByteTransferForKey({hours: 30 * 24}, accessKey.id) ?? 0;
+      // console.log(`Key: [${accessKey.id}], Usage: [${usageBytes}]`);
       const wasOverDataLimit = accessKey.isOverDataLimit;
       let limitBytes = (accessKey.dataLimit ?? this._defaultDataLimit)?.bytes;
       if (limitBytes === undefined) {
@@ -244,7 +244,7 @@ export class ServerAccessKeyRepository implements AccessKeyRepository {
   }
 
   private loadAccessKeys(): Map<string, ServerAccessKey> {
-    let keyMap = new Map<string, ServerAccessKey>();
+    const keyMap = new Map<string, ServerAccessKey>();
     for (const accessKey of this.keyConfig.data().accessKeys) {
       keyMap.set(accessKey.id, makeAccessKey(this.proxyHostname, accessKey));
     }
