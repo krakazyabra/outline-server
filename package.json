@@ -32,5 +32,8 @@
     "hooks": {
       "pre-commit": "npm run lint && npx pretty-quick --staged --pattern '**/*.html'"
     }
+  },
+  "dependencies": {
+    "crypto-random-string": "^4.0.0"
   }
 }
